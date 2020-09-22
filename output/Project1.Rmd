@@ -1,0 +1,138 @@
+---
+title: "Project1"
+output:
+  html_document: default
+  pdf_document: default
+---
+# Applied Data Science @ Columbia
+## Fall 2020
+## Project 1: A "data story" on how Americans vote
+
+### [Project Description](doc/)
+This is the first and only *individual* (as opposed to *team*) this semester. 
+
+Term: Fall 2020
+
++ Project title: The change of voters in each racial group
++ This project is conducted by Siran Qiu
+
++ Project summary: [a short summary] .
+
+
+```{r}
+library(tm)
+library(SnowballC)
+library(wordcloud)
+library(readtext)
+library(haven)
+library(tidyverse)
+library(data.table)
+library(ggplot2)
+library(labelled)
+```
+
+Step 1: Word cloud of 2020 questionnaires-to find the theme of this project
+First,we are going to see what main words appears in 2020 questionnaires are and get some ideas about the information ANES tries to get from respondent.
+```{r, echo=FALSE}
+# anes_pilot_2020ets_varlist.pdf is instruction of variable list of questionnaires and it will give us the question of each variable.
+
+wordbase_2020 <- readtext("~/Desktop/Github/Fall2020-Project1-siranq/doc/anes_pilot_2020ets_varlist.pdf")
+corp_2020 <- Corpus(VectorSource(wordbase_2020))
+corp_2020 <- tm_map(corp_2020, PlainTextDocument)
+corp_2020 <- tm_map(corp_2020, removePunctuation)
+corp_2020 <- tm_map(corp_2020, removeNumbers)
+corp_2020 <- tm_map(corp_2020, removeWords, stopwords(kind = "en"))
+corp_2020 <- tm_map(corp_2020, stripWhitespace)
+corp_2020<-tm_map(corp_2020,content_transformer(tolower))
+corp_2020<-tm_map(corp_2020,removeWords,c("byte","how","you","do","much","would","rate","well","should","favor","neither","following","general","generally","important","int","people","often","think","where","what","please","oppose","scales","past","describe","which"))
+tdm_corp_2020<-TermDocumentMatrix (corp_2020)
+TDM1<-as.matrix(tdm_corp_2020)
+v <- sort(rowSums(TDM1), decreasing = TRUE)
+wordcloud(corp_2020, max.words=100,min.freq=6, random.order=FALSE,scale = c(1.5, 0.25))
+save(corp_2020, file="~/Desktop/Github/Fall2020-Project1-siranq/output/wordcloud_use.RData")
+```
+
+Step2:From the wordcloud, the words relate to race (such as blacks,whites,asians,race) appear more time than other words and I am going to process some variables that may relate to this theme from the data of Time Series Cumulative Data from 1952 to 2016. 
+
+```{r}
+Election_years<-as.character(seq(1952, 2016, 4))
+anes_dat <-read_sav("~/Desktop/Github/Fall2020-Project1-siranq/data/anes_timeseries_cdf.sav")
+anes_use<-anes_dat%>%
+mutate(year=as_factor(VCF0004),turnout=as_factor(VCF0703),vote=as_factor(VCF0706),race=as_factor(VCF0105a),age=as_factor(VCF0102),gender=as_factor(VCF0104),education=as_factor(VCF0110))%>%
+filter(year %in% Election_years)
+anes_dat$VCF0102<-remove_labels(anes_dat$VCF0102)
+anes_dat$VCF0102[anes_dat$VCF0102==c("1")]<-c("17-24")
+anes_dat$VCF0102[anes_dat$VCF0102==c("2")]<-c("25-34")
+anes_dat$VCF0102[anes_dat$VCF0102==c("3")]<-c("35-44")
+anes_dat$VCF0102[anes_dat$VCF0102==c("4")]<-c("45-54")
+anes_dat$VCF0102[anes_dat$VCF0102==c("5")]<-c("55-64")
+anes_dat$VCF0102[anes_dat$VCF0102==c("6")]<-c("65-74")
+anes_dat$VCF0102[anes_dat$VCF0102==c("7")]<-c("75-99 and over")
+data.table(anes_use%>%
+select(year, turnout, vote, race,age, gender,language,education)%>%
+filter(!is.na(turnout))%>% sample_n(10))
+save(anes_use, file="~/Desktop/Github/Fall2020-Project1-siranq/output/data_use.RData")
+
+```
+Step3:Simple analysis
+
+3.1 How did the education level of each racial group change?
+
+
+```{r,fig.height=10,fig.width=8}
+load(file="~/Desktop/Github/Fall2020-Project1-siranq/output/data_use.RData")
+anes_to_race_edu = anes_use %>%
+filter(!is.na(race) & !is.na(education) &!is.na(turnout))%>% 
+group_by(year,education,race)%>%
+count(education)%>%
+group_by(year,race)%>%
+mutate(prop=n/sum(n))
+
+ggplot(anes_to_race_edu,aes(x=year,y=prop,fill=education),rep="best")+
+geom_bar(stat="identity", colour="black")+
+facet_wrap(~race, ncol=1)+ 
+theme_bw()+ 
+theme(axis.text.x=element_text(angle=90))+
+scale_fill_brewer(palette="Blues")+
+labs(title="How the education level of each racial group are")
+
+```
+From the graph above, I discover that both the proportions of high education level of White non-Hispanic and Black non-Hispanic respondent grew from 1952 to 2016 but the interesting thing is that the proportion of high education level of Asians or Pacific Islander non-Hispanic varies from 1968 to 2016. It absolutely makes sense that in 1968 all the Asian respondent is grade school or less because at that time most of them were immigrants. My guess of reason of this variation is that the number of Asian respondent is not as much as White and Blacks.
+
+
+3.2 How did the turnout rate of each racial group change in the election?
+```{r,fig.height=10,fig.width=8}
+anes_to_edu_race = anes_use%>%
+filter(!is.na(race)& !is.na(turnout))%>% 
+group_by(year, race)%>%
+  count(turnout)%>%
+  group_by(year, race)%>%
+  mutate( prop=n/sum(n))
+ggplot(anes_to_edu_race,aes(x=year, y=prop, fill=turnout))+
+  geom_bar(stat="identity", colour="black")+ 
+  facet_wrap(~race, ncol=1)+ 
+  theme_bw()+ 
+  theme(axis.text.x =element_text(angle = 90))+
+  scale_fill_brewer(palette="Reds")
+```
+
+3.3 Age
+
+```{r,fig.height=10,fig.width=15}
+anes_to_race_edu = anes_use %>%
+filter(!is.na(race) & !is.na(age) &!is.na(turnout))%>% 
+group_by(year,age,race)%>%
+count(age)%>%
+group_by(year,race)%>%
+mutate(prop=n/sum(n))
+
+ggplot(anes_to_race_edu,aes(x=year,y=prop,fill=age))+
+geom_bar(stat="identity", colour="black")+
+facet_wrap(~race, ncol=2)+ 
+theme_bw()+ 
+theme(axis.text.x=element_text(angle=90))+
+scale_fill_brewer(palette="Greens")+
+labs(title="How the education level of each racial group are")
+```
+
+
