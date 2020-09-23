@@ -13,11 +13,10 @@ This is the first and only *individual* (as opposed to *team*) this semester.
 
 Term: Fall 2020
 
-+ Project title: The change of voters in each racial group
++ Project title: How did features of voters in each racial group change?
 + This project is conducted by Siran Qiu
 
-+ Project summary: [a short summary] .
-
++ Project summary:First I looked into the wordcloud of 2020 questionnaire question to decide my main topic--race and then I processed the time series data from 1968 to 2020 to see how the way of each racial group voting changed. 
 
 ```{r}
 library(tm)
@@ -29,9 +28,12 @@ library(tidyverse)
 library(data.table)
 library(ggplot2)
 library(labelled)
+library(devtools)
+library(usethis)
 ```
 
-Step 1: Word cloud of 2020 questionnaires-to find the theme of this project
+Step 1: Wordcloud
+Word cloud of 2020 questionnaires-to find the theme of this project
 First,we are going to see what main words appears in 2020 questionnaires are and get some ideas about the information ANES tries to get from respondent.
 ```{r, echo=FALSE}
 # anes_pilot_2020ets_varlist.pdf is instruction of variable list of questionnaires and it will give us the question of each variable.
@@ -51,11 +53,11 @@ v <- sort(rowSums(TDM1), decreasing = TRUE)
 wordcloud(corp_2020, max.words=100,min.freq=6, random.order=FALSE,scale = c(1.5, 0.25))
 save(corp_2020, file="~/Desktop/Github/Fall2020-Project1-siranq/output/wordcloud_use.RData")
 ```
+From the wordcloud, the words relate to race (such as blacks,whites,asians,race) appear more time than other words and I am going to process some variables that may relate to this theme from the data of Time Series Cumulative Data from 1952 to 2016
 
-Step2:From the wordcloud, the words relate to race (such as blacks,whites,asians,race) appear more time than other words and I am going to process some variables that may relate to this theme from the data of Time Series Cumulative Data from 1952 to 2016. 
-
-```{r}
-Election_years<-as.character(seq(1952, 2016, 4))
+Step2:Process the data
+```{r labelled variables subset}
+Election_years=as.character(seq(1968, 2016, 4))
 anes_dat <-read_sav("~/Desktop/Github/Fall2020-Project1-siranq/data/anes_timeseries_cdf.sav")
 anes_use<-anes_dat%>%
 mutate(year=as_factor(VCF0004),turnout=as_factor(VCF0703),vote=as_factor(VCF0706),race=as_factor(VCF0105a),age=as_factor(VCF0102),gender=as_factor(VCF0104),education=as_factor(VCF0110))%>%
@@ -69,16 +71,17 @@ anes_dat$VCF0102[anes_dat$VCF0102==c("5")]<-c("55-64")
 anes_dat$VCF0102[anes_dat$VCF0102==c("6")]<-c("65-74")
 anes_dat$VCF0102[anes_dat$VCF0102==c("7")]<-c("75-99 and over")
 data.table(anes_use%>%
-select(year, turnout, vote, race,age, gender,language,education)%>%
+select(year, turnout, vote, race,age, gender,education)%>%
 filter(!is.na(turnout))%>% sample_n(10))
 save(anes_use, file="~/Desktop/Github/Fall2020-Project1-siranq/output/data_use.RData")
 
 ```
+
 Step3:Simple analysis
 
-3.1 How did the education level of each racial group change?
-
-
+3.1 Education level
+<img src="/Users/siranq/Desktop/GitHub/Fall2020-Project1-siranq/output/vcf0110.png">
+How did the proportions of each racial group in education level change?
 ```{r,fig.height=10,fig.width=8}
 load(file="~/Desktop/Github/Fall2020-Project1-siranq/output/data_use.RData")
 anes_to_race_edu = anes_use %>%
@@ -94,30 +97,55 @@ facet_wrap(~race, ncol=1)+
 theme_bw()+ 
 theme(axis.text.x=element_text(angle=90))+
 scale_fill_brewer(palette="Blues")+
-labs(title="How the education level of each racial group are")
+labs(title="How did the proportions of each racial group in education level change")
 
 ```
-From the graph above, I discover that both the proportions of high education level of White non-Hispanic and Black non-Hispanic respondent grew from 1952 to 2016 but the interesting thing is that the proportion of high education level of Asians or Pacific Islander non-Hispanic varies from 1968 to 2016. It absolutely makes sense that in 1968 all the Asian respondent is grade school or less because at that time most of them were immigrants. My guess of reason of this variation is that the number of Asian respondent is not as much as White and Blacks.
+Story 1:
+From the graph above, I discover that both the proportions of high education level of White non-Hispanic and Black non-Hispanic respondent grew from 1968 to 2016 but the interesting thing is that the proportion of high education level of Asians or Pacific Islander non-Hispanic varies from 1968 to 2016. It absolutely makes sense that in 1968 all the Asian respondent is grade school or less because at that time most of them were immigrants. My guess of reason of this variation is that the number of Asian respondent is not as much as White and Blacks.
+
+Wait!Let's see an old news!
+<img src="/Users/siranq/Desktop/GitHub/Fall2020-Project1-siranq/output/news1image.png">
+<img src="/Users/siranq/Desktop/GitHub/Fall2020-Project1-siranq/output/news1.png">
 
 
-3.2 How did the turnout rate of each racial group change in the election?
+3.2 Who voted?
+<img src="/Users/siranq/Desktop/GitHub/Fall2020-Project1-siranq/output/vcf0703.png">
+How did the proportions of each racial group who voted change?
 ```{r,fig.height=10,fig.width=8}
-anes_to_edu_race = anes_use%>%
-filter(!is.na(race)& !is.na(turnout))%>% 
-group_by(year, race)%>%
-  count(turnout)%>%
-  group_by(year, race)%>%
-  mutate( prop=n/sum(n))
-ggplot(anes_to_edu_race,aes(x=year, y=prop, fill=turnout))+
-  geom_bar(stat="identity", colour="black")+ 
-  facet_wrap(~race, ncol=1)+ 
-  theme_bw()+ 
-  theme(axis.text.x =element_text(angle = 90))+
-  scale_fill_brewer(palette="Reds")
+anes_to_race_year = anes_use %>%
+  filter(!is.na(race) & !is.na(turnout))%>%
+  group_by(year, turnout,race)%>%
+  count(race)%>%
+  group_by(year,turnout)%>%
+  mutate(
+    prop=n/sum(n)
+  )
+
+ggplot(anes_to_race_year, 
+       aes(x=year, y=prop, fill=race)) +
+  geom_bar(stat="identity", colour="black") + facet_wrap(~turnout, ncol=1) + theme_bw()+
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_fill_brewer(palette="Reds")+
+  labs(title="How did the proportions of each racial group who voted change")
+
 ```
+Story 2:
+From the graph above, we can see that although from past to present the respondents were mainly White non-Hispanic, the races of respondents has had more diversity from 1968 to 2016. Especially, during 2008, the proportions of  all the racial groups other than Whites enlarged.
+Guess why?
+Yes,it is because of him.
+
+<img src="/Users/siranq/Desktop/GitHub/Fall2020-Project1-siranq/output/image2.png">
+
+The first Black President in U.S.A.
+Hence, people may pay more attention to vote.
+
 
 3.3 Age
 
+<img src="/Users/siranq/Desktop/GitHub/Fall2020-Project1-siranq/output/vcf0102.png">
+
+
+How did the proportions of each racial group in different age groups change?
 ```{r,fig.height=10,fig.width=15}
 anes_to_race_edu = anes_use %>%
 filter(!is.na(race) & !is.na(age) &!is.na(turnout))%>% 
@@ -132,7 +160,9 @@ facet_wrap(~race, ncol=2)+
 theme_bw()+ 
 theme(axis.text.x=element_text(angle=90))+
 scale_fill_brewer(palette="Greens")+
-labs(title="How the education level of each racial group are")
+labs(title="How did the proportions of each racial group in different age groups change")
 ```
+Story 3:
+From the graph above, we can see that the respondents of Black and Whites are from every age group and mainly concentrated at 25-64. However,the respondents of Asians and Hispanics before 1988 are all from young age group. My guess is that maybe similar to the reason of Story 2, the Asian and Hispanic respondents in that day might be immigrants so they came to U.S.A at young age or they might be the second generations of Asian or Hipanic immigrants. As time flew, after 1988, the respondent who attended the interview became older and the diversity of the respondent's age group became large.
 
 
