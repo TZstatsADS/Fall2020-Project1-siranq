@@ -1,8 +1,8 @@
 ---
 title: "Project1"
 output:
-  html_document: default
   pdf_document: default
+  html_document: default
 ---
 # Applied Data Science @ Columbia
 ## Fall 2020
@@ -16,7 +16,7 @@ Term: Fall 2020
 + Project title: How did features of voters in each racial group change?
 + This project is conducted by Siran Qiu
 
-+ Project summary:First I looked into the wordcloud of 2020 questionnaire question to decide my main topic--race and then I processed the time series data from 1968 to 2020 to see how the way of each racial group voting changed. 
++ Project summary:First, I looked into the wordcloud of 2020 questionnaire question to decide my main topic--race and then I processed the time series data from 1968 to 2020 to see how the way of each racial group voting changed. 
 
 ```{r}
 library(tm)
